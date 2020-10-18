@@ -336,7 +336,7 @@ Function WindowsDiskCleaner
     )
 
     ForEach($Location in $Locations) {
-        Set-ItemProperty -Path $($Base+$Location) -Name $SageSet -Type DWORD -Value 2 -ea silentlycontinue | Out-Null
+        Set-ItemProperty -Path $($Base+$Location) -Name $SageSet -Type DWORD -Value 2 -ErrorAction SilentlyContinue | Out-Null
     }
 
     # do the cleanup . have to convert the SageSet number
@@ -346,7 +346,7 @@ Function WindowsDiskCleaner
     # Remove the Stateflags
     ForEach($Location in $Locations)
     {
-        Remove-ItemProperty -Path $($Base+$Location) -Name $SageSet -Force -ea silentlycontinue | Out-Null
+        Remove-ItemProperty -Path $($Base+$Location) -Name $SageSet -Force -ErrorAction SilentlyContinue | Out-Null
     }
 } 
 
