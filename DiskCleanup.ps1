@@ -182,26 +182,9 @@ Function Cleanup {
     }
     footerItem
     headerItem "Empty Recycle Bin."
-    ## Turns errors back on
-    $ErrorActionPreference = "Continue"
-
-    ## Checks the version of PowerShell
-    ## If PowerShell version 4 or below is installed the following will process
-    if ($PSVersionTable.PSVersion.Major -le 4)
-    {
-
-        ## Empties the recycling bin, the desktop recyling bin
-        $Recycler = (New-Object -ComObject Shell.Application).NameSpace(0xa)
-        $Recycler.items() | ForEach-Object { 
-            ## If PowerShell version 4 or bewlow is installed the following will process
-            Remove-Item -Include $_.path -Force -Recurse -Verbose
-        }
-    }
-    elseif ($PSVersionTable.PSVersion.Major -ge 5)
-    {
-        # -ErrorAction SilentlyContinue needed to suppress error , this is fixed in PS 7
-        Clear-RecycleBin -DriveLetter C -Force -Verbose -ErrorAction SilentlyContinue
-    }
+    # -ErrorAction SilentlyContinue needed to suppress error , this is fixed in PS 7
+    Clear-RecycleBin -DriveLetter C -Force -Verbose -ErrorAction SilentlyContinue
+    
     footerItem
     headerItem "Run Windows Disk Cleaner"
     WindowsDiskCleaner
