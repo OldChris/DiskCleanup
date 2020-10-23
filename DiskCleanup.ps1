@@ -94,14 +94,14 @@ Function Cleanup {
     }
     footerItem
     ## Removes System and User Temp Files - lots of access denied will occur.
-    headerItem "Cleans up c:\windows\temp"
+    headerItem "Clean up c:\windows\temp"
     if (Test-Path $env:windir\Temp\) {
         Remove-Item -Path "$env:windir\Temp\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
     } else {
             Write-Host "C:\Windows\Temp does not exist, there is nothing to cleanup. " -ForegroundColor DarkGray
     }
     footerItem
-    headerItem "Cleans up minidump"
+    headerItem "Clean up minidump"
     if (Test-Path $env:windir\minidump\) {
         Write-host "Deleting minidump files                    " -ForegroundColor Green
         Remove-Item -Path "$env:windir\minidump\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
@@ -109,7 +109,7 @@ Function Cleanup {
         Write-Host "$env:windir\minidump\ does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
     }
     footerItem
-    headerItem "Cleans up prefetch"
+    headerItem "Clean up prefetch"
     if (Test-Path $env:windir\Prefetch\) {
         Remove-Item -Path "$env:windir\Prefetch\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
     } else {
@@ -117,56 +117,56 @@ Function Cleanup {
     }
     footerItem
 
-    headerItem "Cleans up all users windows error reporting" 
+    headerItem "Clean up all users windows error reporting" 
     if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\WER\") {
         Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\WER\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
     } else {
             Write-Host "C:\ProgramData\Microsoft\Windows\WER does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
     }
     footerItem
-    headerItem "Cleans up users temporary internet files" 
+    headerItem "Clean up users temporary internet files" 
     if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\") {
         Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
     } else {
             Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\ does not exist." -ForegroundColor DarkGray
     }
     footerItem
-    headerItem "Cleans up Internet Explorer"
+    headerItem "Clean up Internet Explorer"
     if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatCache\") {
         Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatCache\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
     } else {
             Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatCache\ does not exist." -ForegroundColor DarkGray
     }
     footerItem
-    headerItem "Cleans up Internet Explorer cache"
+    headerItem "Clean up Internet Explorer cache"
     if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatUaCache\") {
         Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatUaCache\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
     } else {
             Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatUaCache\ does not exist." -ForegroundColor DarkGray
     }
     footerItem
-    headerItem "Cleans up Internet Explorer download history"
+    headerItem "Clean up Internet Explorer download history"
     if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\IEDownloadHistory\") {
         Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\IEDownloadHistory\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
     } else {
             Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\IEDownloadHistory\ does not exist." -ForegroundColor DarkGray
     }
     footerItem
-    headerItem "Cleans up Internet Cache"
+    headerItem "Clean up Internet Cache"
     if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\INetCache\") {
         Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\INetCache\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
     } else {
             Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\INetCache\ does not exist." -ForegroundColor DarkGray
     }
     footerItem
-    headerItem "Cleans up Internet Cookies"
+    headerItem "Clean up Internet Cookies"
     if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\INetCookies\") {
         Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\INetCookies\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
     } else {
             Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\INetCookies\ does not exist." -ForegroundColor DarkGray
     }
     footerItem
-    headerItem "Cleans up terminal server cache"
+    headerItem "Clean up terminal server cache"
     if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Terminal Server Client\Cache\") {
         Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Terminal Server Client\Cache\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
     } else {
@@ -237,6 +237,10 @@ function OldLogTempFiles
     $Extensions=".log", ".tmp", ".bak", ".old"
     $totalBytes=0
     $totalFiles=0
+    $totalBytesDeleted=0
+    $totalFilesDeleted=0
+    $totalBytesNotDeleted=0
+    $totalFilesNotDeleted=0
     if ($deleteItem -eq $TRUE)
 	{ 
         Write-Host "Deleting from $ScanPath any $Extensions files older then $global:RetentionDays days." -ForegroundColor Green
@@ -257,15 +261,26 @@ function OldLogTempFiles
             If ($FileExists -eq $True) 
             {
                 Write-Host "File could not be deleted" -ForegroundColor Red
+                $totalFilesNotDeleted+=1;$totalBytesNotDeleted+=$_.Length;
             }
             Else
             {
                 Write-Host "deleted" -ForegroundColor Green
+                $totalFilesDeleted+=1;$totalBytesDeleted+=$_.Length;
 			}
 		#	;
         }
       }
-    Write-Host " total bytes $(formatBytes $totalBytes) in $totalFiles files"
+    if ($deleteItem -eq $TRUE)
+	{ 
+        Write-Host " total $(formatBytes $totalBytes) scanned in $totalFiles files, "
+        Write-Host " total $(formatBytes $totalBytesDeleted) deleted in $totalFilesDeleted files,"
+        Write-Host " total $(formatBytes $totalBytesNotDeleted) not deleted in $totalFilesNotDeleted files"
+    }
+    else
+    {
+        Write-Host " total $(formatBytes $totalBytes) in $totalFiles files"
+    }
 }
 function formatBytes
 {
@@ -297,6 +312,15 @@ function Clear-Eventlogs
     Write-Host "Clearing event logs"
     wevtutil el | Foreach-Object {Write-Progress  -Activity "Clearing events" -Status " $_" ;try { wevtutil cl "$_" 2> $null} catch {}}
 }
+Function runSFC
+{
+    Write-Host "Run SFC utility, a seperate Dos box will open, this can take a while (30 minutes)"
+    $numBefore=(Get-Content C:\windows\Logs\CBS\CBS.log | Select-String -Pattern ', Warning', ', Error' ).length
+    Start-Process -Wait -FilePath "$Env:ComSpec" -ArgumentList "/c title running SFC, please wait to complete&&sfc /scannow&&pause"
+    $numAfter=(Get-Content C:\windows\Logs\CBS\CBS.log | Select-String -Pattern ', Warning', ', Error' ).length
+    $numNew=$numAfter-$numBefore
+    Write-Host "CBS.log has $numNew new Warnings/ Errors"
+}
 
 Function WindowsDiskCleaner
 {
@@ -305,36 +329,46 @@ Function WindowsDiskCleaner
     $Locations= @(
         "Active Setup Temp Folders"
         "BranchCache"
+        "Content Index Cleaner"
+        "D3D Shader Cache"
+        "Delivery Optimization Files"
+        "Device Driver Packages"
+        "Diagnostic Data Viewer database files"
         "Downloaded Program Files"
+        "Download Program Files"
+        "DownloadsFolder"
         "GameNewsFiles"
         "GameStatisticsFiles"
         "GameUpdateFiles"
         "Internet Cache Files"
+        "Language Pack"
         "Memory Dump Files"
         "Offline Pages Files"
         "Old ChkDsk Files"
         "Previous Installations"
         "Recycle Bin"
+        "RetailDemo Offline Content"
         "Service Pack Cleanup"
         "Setup Log Files"
         "System error memory dump files"
         "System error minidump files"
         "Temporary Files"
         "Temporary Setup Files"
-        "Temporary Sync Files"
+      #  "Temporary Sync Files"
         "Thumbnail Cache"
         "Update Cleanup"
         "Upgrade Discarded Files"
         "User file versions"
         "Windows Defender"
-        "Windows Error Reporting Archive Files"
-        "Windows Error Reporting Queue Files"
-        "Windows Error Reporting System Archive Files"
-        "Windows Error Reporting System Queue Files"
+        "Windows Error Reporting Files"
+      #  "Windows Error Reporting Archive Files"
+      #  "Windows Error Reporting Queue Files"
+      #  "Windows Error Reporting System Archive Files"
+      #  "Windows Error Reporting System Queue Files"
         "Windows ESD installation files"
         "Windows Upgrade Log Files"
     )
-
+    # value 2 means 'include' in cleanmgr run, 0 means 'do not run'
     ForEach($Location in $Locations) {
         Set-ItemProperty -Path $($Base+$Location) -Name $SageSet -Type DWORD -Value 2 -ErrorAction SilentlyContinue | Out-Null
     }
@@ -416,6 +450,17 @@ function DiskSpaceStatus
         Out-String
     Return $result
 }
+
+Function LogWriteLine
+{
+    Param
+    (
+        [string] $logtext
+    )
+    $logRecord = (Get-Date -Format "yyyyMMddTHH:mm:ss.ffff") + " " + $logtext
+    Add-content $global:Logfile -value $logRecord
+}
+
 function headerItem
 {
     Param
@@ -423,13 +468,46 @@ function headerItem
       [string] $headerText
     )
     Write-Host $headerText
-    $global:startFreeBytes=diskFreeBytes 
+    $global:startFreeBytesItem=diskFreeBytes 
+    LogWriteLine "$headerText"
 }
 function footerItem
 {
-    $freedUpBytes=($(diskFreeBytes) - $global:startFreeBytes)
-    $freeText=formatBytes $freedUpBytes
- Write-Host "Done (saved  $freeText  )`n"  -ForegroundColor Green -BackgroundColor Black
+    $freedUpBytesItem=($(diskFreeBytes) - $global:startFreeBytesItem)
+    $freedUpBytesTotal=($(diskFreeBytes) - $global:startFreeBytesScript)
+    $freeTextItem=formatBytes $freedUpBytesItem 
+    $freeTextTotal=formatBytes $freedUpBytesTotal
+    $logText="Done (saved  $freeTextItem, total $freeTextTotal  )" 
+    Write-Host "$logText`n"  -ForegroundColor Green -BackgroundColor Black
+    LogWriteLine "$logText"
+}
+function enterNumber()
+{
+    Param
+    (
+        [string] $prompt,
+        [int32] $current,
+        [int32] $default,
+        [int32] $min,
+        [int32] $max
+    )
+    Do
+    {
+        $menuIndex=0
+        if ($warning -ne "")
+        {
+            Write-Host $warning
+        }
+        Write-Host $prompt
+        $result = Read-Host "Enter number between $min and $max, current = $current, Press enter to accept the default [$($default)]"
+        if ($result -eq "")
+        {
+            $result = $default
+        }
+ 
+    } Until (([int]$result -ge $min) -and ([int]$result -le $max))
+    return [int]$result
+ 
 }
 function selectMenuOption()
 {
@@ -501,6 +579,8 @@ function runCleanup
     Write-Host "Before " $diskStatusBefore
     Write-Host "After " $(DiskSpaceStatus)
     Write-Host "==> Cleaned up $(formatBytes ($freeBytesBefore-(diskFreeBytes)))"
+    Write-Host "    since first run $(formatBytes ($Global:startScriptFreeBytes-(diskFreeBytes)))"
+
     $Finished = (Get-Date)
 
     $minutes=[math]::floor(($Finished - $Starters).totalminutes)
@@ -513,21 +593,30 @@ function runCleanup
 }
 
 Clear-Host 
-$thisAppName=(Get-Item $PSCommandPath).Basename
-Write-Host "$thisAppName, clean disk C:\"
-Write-Host "$(Hostname): PS Version :"$PSVersionTable.PSVersion : "Script " $PSCommandPath 
+if ($PSVersionTable.PSVersion.Major -lt 5)
+{
+  Write-Host "Powershell Version : " $PSVersionTable.PSVersion  " should be at least version 5, please upgrade Powershell"
+  exit
+}
 $thisPath=Split-Path $PSCommandPath -Parent
 Set-Location $thisPath
+$thisAppName=(Get-Item $PSCommandPath).Basename
+
+$global:Logfile=$thisPath+"\"+ $thisAppName+ "_" + $(Get-Date -Format "yyyyMMddTHHmmss") + ".log"
 $global:RetentionDays = 7
+$Global:startFreeBytesScript=diskFreeBytes
+Write-Host "$thisAppName, clean disk C:\"
+Write-Host "$(Hostname): PS Version :$($PSVersionTable.PSVersion) : Script  $PSCommandPath : Logfile $global:Logfile" 
 if (-Not(RunsAsAdministrator))
 {
     Write-Host "Please run script as an administrator"
-    $list='Run as Administrator|Quit'
+    $list="Run as Administrator"
+    $list+="|Quit"
     Write-Host ""
     $answer=selectMenuOption "Enter your choise:" $list 'Quit' $TRUE
     Switch ($answer)
     {
-        {$_ -eq 1} {Start-Process "$psHome\powershell.exe" -Verb Runas -ArgumentList "-file ""$PSCommandPath""";Break}
+        {$_ -eq 1} {Start-Process "$psHome\powershell_ise.exe" -Verb Runas -ArgumentList "-file ""$PSCommandPath""";Break}
         {$_ -eq 2} {exit;Break}
         Default { exit }
     }
@@ -540,6 +629,8 @@ else
         $list+="|List temp files older then $global:RetentionDays days"
         $list+="|Delete temp files older then $global:RetentionDays days"
         $list+="|Scan for large files"
+        $list+="|Enter Retention days"
+        $list+="|Run sfc utility"
         $list+="|Quit"
         Write-Host ""
         $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Quit' $TRUE
@@ -549,7 +640,9 @@ else
             {$_ -eq 2} {OldLogTempFiles $FALSE;Break}
             {$_ -eq 3} {OldLogTempFiles $TRUE;Break}
             {$_ -eq 4} {ShowLargeFiles;Break}
-            {$_ -eq 5} {exit;Break}
+            {$_ -eq 5} {$global:RetentionDays=$(enterNumber "Enter retention days" $global:RetentionDays 7 1 30);Break}
+            {$_ -eq 6} {runSFC;Break}
+            {$_ -eq 7} {exit;Break}
             Default { exit }
         }
     }
