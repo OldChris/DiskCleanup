@@ -64,7 +64,7 @@ Function Cleanup {
 #
 #  functions that clean files, folders, etcetera
 #
-function cleanFolder
+Function cleanFolder
 {
     Param
     (
@@ -139,7 +139,7 @@ Function removeFile
     footerItem
 }
 
-function OldLogTempFiles
+Function OldLogTempFiles
 {
     Param
     (
@@ -196,7 +196,7 @@ function OldLogTempFiles
     }
     footerItem
 }
-function ShowLargeFiles
+Function ShowLargeFiles
 {
     $ScanPath="C:\"
     Write-Host "Scanning $ScanPath for any large files." -ForegroundColor Green
@@ -209,23 +209,12 @@ function ShowLargeFiles
 }
 
 
-function clearEventlogs 
+Function clearEventlogs 
 {
     wevtutil el | Foreach-Object {Write-Progress  -Activity "Clearing events" -Status " $_" ;try { wevtutil cl "$_" 2> $null} catch {}}
     Write-Progress -Activity  "Done" -Status "Done" -Completed
 }
 
-Function runSFC
-{
-    headerItem "Run SFC utility"
-    Write-Host " a seperate Dos box will open, this can take a while (30 minutes)"
-    $numBefore=(Get-Content C:\windows\Logs\CBS\CBS.log | Select-String -Pattern ', Warning', ', Error' ).length
-    Start-Process -Wait -FilePath "$Env:ComSpec" -ArgumentList "/c title running SFC, please wait to complete&&sfc /scannow&&pause"
-    $numAfter=(Get-Content C:\windows\Logs\CBS\CBS.log | Select-String -Pattern ', Warning', ', Error' ).length
-    $numNew=$numAfter-$numBefore
-    Write-Host "CBS.log has $numNew new Warnings/ Errors"
-    footerItem
-}
 
 Function WindowsDiskCleaner
 {
@@ -291,7 +280,7 @@ Function WindowsDiskCleaner
     }
 } 
 
-function cleanSoftwareDistribution
+Function cleanSoftwareDistribution
 {
     ## Stops the windows update service so that c:\windows\softwaredistribution can be cleaned up
     Get-Service -Name wuauserv | Stop-Service -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue -Verbose
@@ -303,9 +292,31 @@ function cleanSoftwareDistribution
     Get-Service -Name bits | Start-Service -ErrorAction SilentlyContinue -Verbose
 }
 #
+# Check Disk and Filesystem functions
+#
+Function runSFC
+{
+    headerItem "Run SFC utility"
+    Write-Host " a seperate Dos box will open, this can take a while (30 minutes)"
+    $numBefore=(Get-Content C:\windows\Logs\CBS\CBS.log | Select-String -Pattern ', Warning', ', Error' ).length
+    Start-Process -Wait -FilePath "$Env:ComSpec" -ArgumentList "/c title running SFC, please wait to complete&&sfc /scannow&&pause"
+    $numAfter=(Get-Content C:\windows\Logs\CBS\CBS.log | Select-String -Pattern ', Warning', ', Error' ).length
+    $numNew=$numAfter-$numBefore
+    Write-Host "CBS.log has $numNew new Warnings/ Errors"
+    footerItem
+}
+
+Function runRepairVolune
+{
+    headerItem "Scan volume drive C"
+    Repair-Volume -DriveLetter C -Scan
+    footerItem
+}
+
+#
 #  other functions (formatting, user interaction etc)
 #
-function formatBytes
+Function formatBytes
 {
     param
     (
@@ -337,13 +348,13 @@ function formatBytes
 } 
 
 
-function diskFreeBytes
+Function diskFreeBytes
 {
     $DevInfo=Get-WmiObject -Class Win32_logicaldisk -Filter "DeviceID = 'C:'"  
     Return $DevInfo.FreeSpace
 }
 
-function DiskSpaceStatus
+Function DiskSpaceStatus
 {
  $result=Get-WmiObject Win32_LogicalDisk | Where-Object { $_.DriveType -eq "3" } | Select-Object SystemName,
     @{ Name = "Drive" ; Expression = { ( $_.DeviceID ) } },
@@ -365,7 +376,7 @@ Function LogWriteLine
     Add-content $global:Logfile -value $logRecord
 }
 
-function headerItem
+Function headerItem
 {
     Param
     (
@@ -375,7 +386,7 @@ function headerItem
     $global:startFreeBytesItem=diskFreeBytes 
     LogWriteLine "$headerText"
 }
-function footerItem
+Function footerItem
 {
     $freedUpBytesItem=($(diskFreeBytes) - $global:startFreeBytesItem)
     $freedUpBytesTotal=($(diskFreeBytes) - $global:startFreeBytesScript)
@@ -385,7 +396,7 @@ function footerItem
     Write-Host "$logText`n"  -ForegroundColor Green -BackgroundColor Black
     LogWriteLine "$logText"
 }
-function enterNumber()
+Function enterNumber()
 {
     Param
     (
@@ -413,7 +424,7 @@ function enterNumber()
     return [int]$result
  
 }
-function selectMenuOption()
+Function selectMenuOption()
 {
     Param
     (
@@ -473,7 +484,7 @@ function selectMenuOption()
     }
 }
 
-function RunsAsAdministrator
+Function RunsAsAdministrator
 {
     try {
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -483,10 +494,9 @@ function RunsAsAdministrator
         throw "Failed to determine if the current user has elevated privileges. The error was: '{0}'." -f $_
         return $FALSE
     }
-
 }
 
-function runCleanup
+Function runCleanup
 {
     Write-Host "Start script at " (Get-Date | Select-Object -ExpandProperty DateTime)
     $Starters = (Get-Date)
@@ -509,6 +519,25 @@ function runCleanup
 
 }
 
+Function menuCheckDiskFS
+{
+# check disk and filesystem
+    While (1 -eq 1)
+    {
+        $list="Run DiskCheck"
+        $list+="|Run System File Checker (SFC) utility"
+        $list+="|Return to main menu"
+        Write-Host ""
+        $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Quit' $TRUE
+        Switch ($answer)
+        {
+            {$_ -eq 1} {runRepairVolune;Break}
+            {$_ -eq 2} {runSFC;Break}
+            {$_ -eq 3} {Return;Break}
+            Default { Return }
+        }
+    }
+}
 
 Clear-Host 
 if ($PSVersionTable.PSVersion.Major -lt 5)
@@ -548,7 +577,7 @@ else
         $list+="|Delete temp files older then $global:RetentionDays days"
         $list+="|Scan for large files"
         $list+="|Change Retention days"
-        $list+="|Run System File Checker (SFC) utility"
+        $list+="|Check Disk and Filesystem menu"
         $list+="|Quit"
         Write-Host ""
         $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Quit' $TRUE
@@ -559,7 +588,7 @@ else
             {$_ -eq 3} {OldLogTempFiles $TRUE;Break}
             {$_ -eq 4} {ShowLargeFiles;Break}
             {$_ -eq 5} {$global:RetentionDays=$(enterNumber "Change retention days" $global:RetentionDays 7 1 30);Break}
-            {$_ -eq 6} {runSFC;Break}
+            {$_ -eq 6} {menuCheckDiskFS;Break}
             {$_ -eq 7} {exit;Break}
             Default { exit }
         }
