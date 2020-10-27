@@ -15,172 +15,36 @@
 #
 Function Cleanup {
     
-    headerItem "Delete the contents of the Windows Temp folder."
-    Get-ChildItem "C:\Windows\Temp\*" -Recurse -Force -Verbose -ErrorAction SilentlyContinue |
-        Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays( - $global:RetentionDays)) } | Remove-Item -force -recurse -ErrorAction SilentlyContinue -Verbose
-    footerItem
+    cleanFolder "C:\Users\*\AppData\Local\Temp\*" @("*") $global:RetentionDays $True
+    cleanFolder "C:\Users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\*" @("*") $global:RetentionDays $True
+    cleanFolder "C:\Users\*\AppData\Local\Microsoft\Windows\WER\*" @("*") $global:RetentionDays $True
+    cleanFolder "C:\Users\*\AppData\Local\Microsoft\Windows\Explorer\*" @(".etl", ".db") $global:RetentionDays $True
+    cleanFolder "C:\Users\*\AppData\Local\Microsoft\Internet Explorer\*" @("*") $global:RetentionDays $True
+    cleanFolder "C:\Users\*\AppData\Local\Microsoft\Terminal Server Client\Cache\*" @("*") $global:RetentionDays $True
 
+    cleanFolder "$Env:windir\SoftwareDistribution\DataStore\Logs\**" @(".log") $global:RetentionDays $True
+    cleanFolder "$Env:windir\Performance\WinSAT\DataStore\*" @("*") $global:RetentionDays $True
+    cleanFolder "$Env:windir\system32\catroot2\*" @(".jrs", ".log") $global:RetentionDays $True
+    cleanFolder "$Env:windir\system32\wdi\LogFiles\*" @("*") $global:RetentionDays $True
+    cleanFolder "$Env:windir\debug\*" @(".log") $global:RetentionDays $True
+    cleanFolder "$Env:windir\Temp\*" @("*") $global:RetentionDays $True
+    cleanFolder "$Env:windir\Prefetch\*" @("*") $global:RetentionDays $True
+    cleanFolder "C:\ProgramData\Microsoft\Windows\WER\*" @("*") $global:RetentionDays $True
 
-    headerItem "Deletes all files and folders in user's Temp folder older then $global:RetentionDays days"
-    Get-ChildItem "C:\users\*\AppData\Local\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue |
-        Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays( - $global:RetentionDays))} |
-        Remove-Item -force -recurse -ErrorAction SilentlyContinue -Verbose
-    footerItem
+    cleanFolder "$Env:windir\logs\CBS\*" @(".log") 0 $True
+    cleanFolder "C:\inetpub\logs\LogFiles\*" @("*") 0 $True
 
-    headerItem "Removes all files and folders in user's Temporary Internet Files older then $global:RetentionDays days"
-    Get-ChildItem "C:\users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\*" `
-        -Recurse -Force -Verbose -ErrorAction SilentlyContinue |
-        Where-Object {($_.CreationTime -lt $(Get-Date).AddDays( - $global:RetentionDays))} |
-        Remove-Item -Force -Recurse -ErrorAction SilentlyContinue -Verbose
-    footerItem
+    removeFolder "C:\PerfLogs" 
+    removeFolder "C:\Config.Msi" 
+    removeFolder "c:\Intel"
 
-    headerItem "Removes *.log from C:\windows\CBS"
-    if(Test-Path C:\Windows\logs\CBS\){
-    Get-ChildItem "C:\Windows\logs\CBS\*.log" -Recurse -Force -ErrorAction SilentlyContinue |
-        remove-item -force -recurse -ErrorAction SilentlyContinue -Verbose
-    } else {
-        Write-Host "C:\inetpub\logs\LogFiles\ does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Cleans IIS Logs older then $global:RetentionDays days"
-    if (Test-Path C:\inetpub\logs\LogFiles\) {
-        Get-ChildItem "C:\inetpub\logs\LogFiles\*" -Recurse -Force -ErrorAction SilentlyContinue |
-            Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-60)) } | Remove-Item -Force -Verbose -Recurse -ErrorAction SilentlyContinue
-    }
-    else {
-        Write-Host "C:\Windows\logs\CBS\ does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Removes C:\Config.Msi"
-    if (test-path C:\Config.Msi){
-        remove-item -Path C:\Config.Msi -force -recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-        Write-Host "C:\Config.Msi does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
-    }
-    footerItem
-
-    headerItem "Removes c:\Intel"
-    if (test-path c:\Intel){
-        remove-item -Path c:\Intel -force -recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-        Write-Host "c:\Intel does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Removes c:\PerfLogs"
-    if (test-path c:\PerfLogs){
-        remove-item -Path c:\PerfLogs -force -recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-        Write-Host "c:\PerfLogs does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Removes $env:windir\memory.dmp"
-    if (test-path $env:windir\memory.dmp){
-        remove-item $env:windir\memory.dmp -force -Verbose -ErrorAction SilentlyContinue
-    } else {
-        Write-Host "C:\Windows\memory.dmp does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
-    }
-    footerItem
+    removeFile "$Env:windir\memory.dmp" $global:RetentionDays
+    removeFile "C:\ProgramData\Microsoft\Windows\Power Efficiency Diagnostics\energy-report-*-*-*.xml" $global:RetentionDays
 
     headerItem "Cleaning WinSxS folder" 
     dism /online /Cleanup-Image /StartComponentCleanup /ResetBase
     footerItem
 
-
-    headerItem "Remove Windows Error Reporting files"
-    if (test-path C:\ProgramData\Microsoft\Windows\WER){
-        Get-ChildItem -Path C:\ProgramData\Microsoft\Windows\WER -Recurse | Remove-Item -force -recurse -Verbose -ErrorAction SilentlyContinue
-         } else {
-            Write-Host "C:\ProgramData\Microsoft\Windows\WER does not exist, there is nothing to cleanup."  -ForegroundColor DarkGray
-    }
-    footerItem
-    ## Removes System and User Temp Files - lots of access denied will occur.
-    headerItem "Clean up c:\windows\temp"
-    if (Test-Path $env:windir\Temp\) {
-        Remove-Item -Path "$env:windir\Temp\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-            Write-Host "C:\Windows\Temp does not exist, there is nothing to cleanup. " -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Clean up minidump"
-    if (Test-Path $env:windir\minidump\) {
-        Write-host "Deleting minidump files                    " -ForegroundColor Green
-        Remove-Item -Path "$env:windir\minidump\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-        Write-Host "$env:windir\minidump\ does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Clean up prefetch"
-    if (Test-Path $env:windir\Prefetch\) {
-        Remove-Item -Path "$env:windir\Prefetch\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-        Write-Host "$env:windir\Prefetch\ does not exist, there is nothing to cleanup."  -ForegroundColor DarkGray
-    }
-    footerItem
-
-    headerItem "Clean up all users windows error reporting" 
-    if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\WER\") {
-        Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\WER\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-            Write-Host "C:\ProgramData\Microsoft\Windows\WER does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Clean up users temporary internet files" 
-    if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\") {
-        Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-            Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\ does not exist." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Clean up Internet Explorer"
-    if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatCache\") {
-        Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatCache\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-            Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatCache\ does not exist." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Clean up Internet Explorer cache"
-    if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatUaCache\") {
-        Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatUaCache\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-            Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\IECompatUaCache\ does not exist." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Clean up Internet Explorer download history"
-    if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\IEDownloadHistory\") {
-        Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\IEDownloadHistory\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-            Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\IEDownloadHistory\ does not exist." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Clean up Internet Cache"
-    if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\INetCache\") {
-        Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\INetCache\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-            Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\INetCache\ does not exist." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Clean up Internet Cookies"
-    if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Windows\INetCookies\") {
-        Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Windows\INetCookies\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-            Write-Host "C:\Users\*\AppData\Local\Microsoft\Windows\INetCookies\ does not exist." -ForegroundColor DarkGray
-    }
-    footerItem
-    headerItem "Clean up terminal server cache"
-    if (Test-Path "C:\Users\*\AppData\Local\Microsoft\Terminal Server Client\Cache\") {
-        Remove-Item -Path "C:\Users\*\AppData\Local\Microsoft\Terminal Server Client\Cache\*" -Force -Recurse -Verbose -ErrorAction SilentlyContinue
-    } else {
-            Write-Host "C:\Users\*\AppData\Local\Microsoft\Terminal Server Client\Cache\ does not exist." -ForegroundColor DarkGray
-    }
-    footerItem
- 
-    headerItem "Removes the hidden recycling bin."
-    if (Test-path 'C:\$Recycle.Bin'){
-        Remove-Item 'C:\$Recycle.Bin' -Recurse -Force -Verbose -ErrorAction SilentlyContinue
-    } else {
-        Write-Host "C:\`$Recycle.Bin does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
-    }
-    footerItem
     headerItem "Empty Recycle Bin."
     # -ErrorAction SilentlyContinue needed to suppress error , this is fixed in PS 7
     Clear-RecycleBin -DriveLetter C -Force -Verbose -ErrorAction SilentlyContinue
@@ -190,23 +54,89 @@ Function Cleanup {
     WindowsDiskCleaner
     footerItem
     headerItem "Clean Events logs" 
-    Clear-Eventlogs
+    clearEventlogs
     footerItem
     headerItem "Clean Software Distribution folder" 
     cleanSoftwareDistribution
     footerItem
 }
 
-function ShowLargeFiles
+#
+#  functions that clean files, folders, etcetera
+#
+function cleanFolder
 {
-    $ScanPath="C:\"
-    Write-Host "Scanning $ScanPath for any large files." -ForegroundColor Green
-    Write-Host ( Get-ChildItem $ScanPath -Recurse -ErrorAction SilentlyContinue | 
-  #  Where-Object { $Extensions -contains $_.Extension}| 
-    Where-Object { $_.Length -gt 1GB}| 
-    Sort-Object Length -Descending | Select-Object Name, Directory,
-                    @{Name = "Size (GB)"; Expression = { "{0:N2}" -f ($_.Length / 1GB) }} | Format-Table  -AutoSize |
-        Out-String )
+    Param
+    (
+      [string] $folder,
+      [string[]] $extensions,
+      [int32]  $retentionDays,
+      [bool]   $recursive
+    )
+    if ($recursive -eq $True)
+    {
+        $recurse= @{'Recurse' = $True}
+    }
+    else
+    {
+        $recurse=""
+    }
+    headerItem "Clean folder $folder any $extensions files older then $retentionDays days." -ForegroundColor Green
+    if (Test-Path "$folder")
+    {
+        Get-ChildItem "$folder" @recurse -Force -ErrorAction SilentlyContinue |
+            #  Where-Object { $extensions -contains $_.Extension}| 
+              Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$retentionDays)) } | 
+        % { 
+            if ($extensions -contains $_.Extension)
+            { 
+                Remove-Item $_.FullName -Force -Verbose -ErrorAction SilentlyContinue
+            } 
+            else 
+            { 
+              if ($extensions -contains "*")
+              {
+                Remove-Item $_.FullName -Force -Recurse -Verbose -ErrorAction SilentlyContinue
+              }
+            }  
+          }    
+    }
+    else
+    {
+        Write-Host "$folder does not exist." -ForegroundColor DarkGray
+    }
+    footerItem
+}
+Function removeFolder
+{
+    Param
+    (
+      [string] $folder
+    ) 
+    headerItem "Removes folder $folder"
+    if (Test-path "$folder")
+    {
+        Remove-Item "$folder" -Recurse -Force -Verbose -ErrorAction SilentlyContinue
+    }
+    else
+    {
+        Write-Host "Folder $folder does not exist, there is nothing to cleanup." -ForegroundColor DarkGray
+    }
+    footerItem
+}
+
+Function removeFile
+{
+    Param
+    (
+      [string] $file,
+      [int32] $retentionDays
+    ) 
+    headerItem "Removes file $file"
+    Get-ChildItem -Path $file -ErrorAction SilentlyContinue | 
+    Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$retentionDays)) }|
+     Remove-Item -ErrorAction SilentlyContinue 
+    footerItem
 }
 
 function OldLogTempFiles
@@ -226,11 +156,11 @@ function OldLogTempFiles
     $totalFilesNotDeleted=0
     if ($deleteItem -eq $TRUE)
 	{ 
-        Write-Host "Deleting from $ScanPath any $Extensions files older then $global:RetentionDays days." -ForegroundColor Green
+        headerItem "Deleting from $ScanPath any $Extensions files older then $global:RetentionDays days." -ForegroundColor Green
     }
     else
     {
-        Write-Host "Scanning $ScanPath for any $Extensions files older then $global:RetentionDays days." -ForegroundColor Green
+        headerItem "Scanning $ScanPath for any $Extensions files older then $global:RetentionDays days." -ForegroundColor Green
     }
     Get-ChildItem -Path $ScanPath -Recurse -ErrorAction SilentlyContinue | 
     Where-Object { $Extensions -contains $_.Extension}| 
@@ -264,49 +194,42 @@ function OldLogTempFiles
     {
         Write-Host " total $(formatBytes $totalBytes) in $totalFiles files"
     }
+    footerItem
 }
-function formatBytes
+function ShowLargeFiles
 {
-    param
-    (
-        [long] $theBytes
-    )
-    if ($theBytes -lt 0)
-    {
-        $theBytes*=-1
-        $sign="-"
-    }
-    else
-    {
-        $sign=""
-    }
-    Switch ($theBytes )
-    {
-        {$_ -gt 1tb} {$bytesText="$([math]::round(($theBytes/1tb),2)) teraByte";Break}
-        {$_ -gt 1gb} {$bytesText="$([math]::round(($theBytes/1gb),2)) gigaByte";Break}
-        {$_ -gt 1mb} {$bytesText="$([math]::round(($theBytes/1mb),2)) megaByte";Break}
-        {$_ -gt 1kb} {$bytesText="$([math]::round(($theBytes/1kb),2)) kiloByte";Break}
-        Default { $bytesText="$theBytes Bytes"}
-    }
-    return "$sign$bytesText"
-} 
-function Clear-Eventlogs 
+    $ScanPath="C:\"
+    Write-Host "Scanning $ScanPath for any large files." -ForegroundColor Green
+    Write-Host ( Get-ChildItem $ScanPath -Recurse -ErrorAction SilentlyContinue | 
+  #  Where-Object { $Extensions -contains $_.Extension}| 
+    Where-Object { $_.Length -gt 1GB}| 
+    Sort-Object Length -Descending | Select-Object Name, Directory,
+                    @{Name = "Size (GB)"; Expression = { "{0:N2}" -f ($_.Length / 1GB) }} | Format-Table  -AutoSize |
+        Out-String )
+}
+
+
+function clearEventlogs 
 {
-    Write-Host "Clearing event logs"
     wevtutil el | Foreach-Object {Write-Progress  -Activity "Clearing events" -Status " $_" ;try { wevtutil cl "$_" 2> $null} catch {}}
+    Write-Progress -Activity  "Done" -Status "Done" -Completed
 }
+
 Function runSFC
 {
-    Write-Host "Run SFC utility, a seperate Dos box will open, this can take a while (30 minutes)"
+    headerItem "Run SFC utility"
+    Write-Host " a seperate Dos box will open, this can take a while (30 minutes)"
     $numBefore=(Get-Content C:\windows\Logs\CBS\CBS.log | Select-String -Pattern ', Warning', ', Error' ).length
     Start-Process -Wait -FilePath "$Env:ComSpec" -ArgumentList "/c title running SFC, please wait to complete&&sfc /scannow&&pause"
     $numAfter=(Get-Content C:\windows\Logs\CBS\CBS.log | Select-String -Pattern ', Warning', ', Error' ).length
     $numNew=$numAfter-$numBefore
     Write-Host "CBS.log has $numNew new Warnings/ Errors"
+    footerItem
 }
 
 Function WindowsDiskCleaner
 {
+    # when changing StateFlags number please check run command for cleanmgr
     $SageSet = "StateFlags0099"
     $Base = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\"
     $Locations= @(
@@ -358,7 +281,8 @@ Function WindowsDiskCleaner
 
     # do the cleanup . have to convert the SageSet number
     $Args = "/sagerun:$([string]([int]$SageSet.Substring($SageSet.Length-4)))"
-    Start-Process -Wait "$env:SystemRoot\System32\cleanmgr.exe" -ArgumentList $Args #-WindowStyle Hidden
+   # Start-Process -Wait "$env:SystemRoot\System32\cleanmgr.exe" -ArgumentList $Args #-WindowStyle Hidden
+    Start-Process -Wait -FilePath "$Env:ComSpec" -ArgumentList "/c title running Cleanmgr, please wait to complete&&echo Cleanmgr is running, please wait...&&cleanmgr /sagerun:99&&pause"
 
     # Remove the Stateflags
     ForEach($Location in $Locations)
@@ -367,55 +291,52 @@ Function WindowsDiskCleaner
     }
 } 
 
-function RunsAsAdministrator
-{
-    try {
-        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-        $principal = New-Object Security.Principal.WindowsPrincipal -ArgumentList $identity
-        return $principal.IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )
-    } catch {
-        throw "Failed to determine if the current user has elevated privileges. The error was: '{0}'." -f $_
-        return $FALSE
-    }
-
-}
-
 function cleanSoftwareDistribution
 {
     ## Stops the windows update service so that c:\windows\softwaredistribution can be cleaned up
     Get-Service -Name wuauserv | Stop-Service -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue -Verbose
     Get-Service -Name bits | Stop-Service -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue -Verbose
-
-
     ## Deletes the contents of windows software distribution.
     Get-ChildItem "C:\Windows\SoftwareDistribution\*" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -recurse -ErrorAction SilentlyContinue -Verbose
     ## Restarts wuauserv and bits services
     Get-Service -Name wuauserv | Start-Service -ErrorAction SilentlyContinue -Verbose
     Get-Service -Name bits | Start-Service -ErrorAction SilentlyContinue -Verbose
 }
-
-function cleanSCOM
+#
+#  other functions (formatting, user interaction etc)
+#
+function formatBytes
 {
-    exit  # do not run
-    # Sets the SCCM cache size to 1 GB if it exists.
-    Try
+    param
+    (
+        [long] $theBytes
+    )
+    if ($theBytes -lt 0)
     {
-        if ((Get-WmiObject -namespace root\ccm\SoftMgmtAgent -class CacheConfig) -ne "$null")
-        {
-            # if data is returned and sccm cache is configured it will shrink the size to 1024MB.
-            $cache = Get-WmiObject -namespace root\ccm\SoftMgmtAgent -class CacheConfig
-            $Cache.size = 1024 | Out-Null
-            $Cache.Put() | Out-Null
-            Restart-Service ccmexec -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
-        }
+        $theBytes*=-1
+        $sign="-"
     }
-    Catch [System.Exception]{
-        Write-host "SCOM  is not installed!" -ForegroundColor Red 
-        Write-host "[ERROR]" -ForegroundColor Red -BackgroundColor black
+    else
+    {
+        $sign=""
     }
+    Switch ($theBytes )
+    {
+        {$_ -gt 1tb} {$bytesText="$([math]::round(($theBytes/1tb),2)) teraBytes";Break}
+        {$_ -gt 1gb} {$bytesText="$([math]::round(($theBytes/1gb),2)) gigaBytes";Break}
+        {$_ -gt 1mb} {$bytesText="$([math]::round(($theBytes/1mb),2)) megaBytes";Break}
+        {$_ -gt 1kb} {$bytesText="$([math]::round(($theBytes/1kb),2)) kiloBytes";Break}
+        {$_ -eq 1tb} {$bytesText="1 teraByte";Break}
+        {$_ -eq 1gb} {$bytesText="1 gigaByte";Break}
+        {$_ -eq 1mb} {$bytesText="1 megaByte";Break}
+        {$_ -eq 1kb} {$bytesText="1 kiloByte";Break}
+        {$_ -eq 1} {$bytesText="1 Byte";Break}
+        Default { $bytesText="$theBytes Bytes"}
+    }
+    return "$sign$bytesText"
+} 
 
 
-}
 function diskFreeBytes
 {
     $DevInfo=Get-WmiObject -Class Win32_logicaldisk -Filter "DeviceID = 'C:'"  
@@ -460,7 +381,7 @@ function footerItem
     $freedUpBytesTotal=($(diskFreeBytes) - $global:startFreeBytesScript)
     $freeTextItem=formatBytes $freedUpBytesItem 
     $freeTextTotal=formatBytes $freedUpBytesTotal
-    $logText="Done (saved  $freeTextItem, total $freeTextTotal  )" 
+    $logText="Done (cleaned up  $freeTextItem, total $freeTextTotal  )" 
     Write-Host "$logText`n"  -ForegroundColor Green -BackgroundColor Black
     LogWriteLine "$logText"
 }
@@ -552,6 +473,19 @@ function selectMenuOption()
     }
 }
 
+function RunsAsAdministrator
+{
+    try {
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = New-Object Security.Principal.WindowsPrincipal -ArgumentList $identity
+        return $principal.IsInRole( [Security.Principal.WindowsBuiltInRole]::Administrator )
+    } catch {
+        throw "Failed to determine if the current user has elevated privileges. The error was: '{0}'." -f $_
+        return $FALSE
+    }
+
+}
+
 function runCleanup
 {
     Write-Host "Start script at " (Get-Date | Select-Object -ExpandProperty DateTime)
@@ -575,6 +509,7 @@ function runCleanup
 
 }
 
+
 Clear-Host 
 if ($PSVersionTable.PSVersion.Major -lt 5)
 {
@@ -585,7 +520,7 @@ $thisPath=Split-Path $PSCommandPath -Parent
 Set-Location $thisPath
 $thisAppName=(Get-Item $PSCommandPath).Basename
 
-$global:Logfile=$thisPath+"\"+ $thisAppName+ "_" + $(Get-Date -Format "yyyyMMddTHHmmss") + ".log"
+$global:Logfile=$thisPath+"\"+ $thisAppName+ "_" + $(Hostname) + "_" + $(Get-Date -Format "yyyyMMddTHHmmss") + ".log"
 $global:RetentionDays = 7
 $Global:startFreeBytesScript=diskFreeBytes
 Write-Host "$thisAppName, clean disk C:\"
@@ -612,8 +547,8 @@ else
         $list+="|List temp files older then $global:RetentionDays days"
         $list+="|Delete temp files older then $global:RetentionDays days"
         $list+="|Scan for large files"
-        $list+="|Enter Retention days"
-        $list+="|Run sfc utility"
+        $list+="|Change Retention days"
+        $list+="|Run System File Checker (SFC) utility"
         $list+="|Quit"
         Write-Host ""
         $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Quit' $TRUE
@@ -623,7 +558,7 @@ else
             {$_ -eq 2} {OldLogTempFiles $FALSE;Break}
             {$_ -eq 3} {OldLogTempFiles $TRUE;Break}
             {$_ -eq 4} {ShowLargeFiles;Break}
-            {$_ -eq 5} {$global:RetentionDays=$(enterNumber "Enter retention days" $global:RetentionDays 7 1 30);Break}
+            {$_ -eq 5} {$global:RetentionDays=$(enterNumber "Change retention days" $global:RetentionDays 7 1 30);Break}
             {$_ -eq 6} {runSFC;Break}
             {$_ -eq 7} {exit;Break}
             Default { exit }
