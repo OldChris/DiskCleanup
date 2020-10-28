@@ -22,7 +22,7 @@ Function Cleanup {
     cleanFolder "C:\Users\*\AppData\Local\Microsoft\Internet Explorer\*" @("*") $global:RetentionDays $True
     cleanFolder "C:\Users\*\AppData\Local\Microsoft\Terminal Server Client\Cache\*" @("*") $global:RetentionDays $True
 
-    cleanFolder "$Env:windir\SoftwareDistribution\DataStore\Logs\**" @(".log") $global:RetentionDays $True
+    cleanFolder "$Env:windir\SoftwareDistribution\DataStore\Logs\*" @(".log") $global:RetentionDays $True
     cleanFolder "$Env:windir\Performance\WinSAT\DataStore\*" @("*") $global:RetentionDays $True
     cleanFolder "$Env:windir\system32\catroot2\*" @(".jrs", ".log") $global:RetentionDays $True
     cleanFolder "$Env:windir\system32\wdi\LogFiles\*" @("*") $global:RetentionDays $True
@@ -40,6 +40,10 @@ Function Cleanup {
 
     removeFile "$Env:windir\memory.dmp" $global:RetentionDays
     removeFile "C:\ProgramData\Microsoft\Windows\Power Efficiency Diagnostics\energy-report-*-*-*.xml" $global:RetentionDays
+
+
+	cleanIE_Chrome
+
 
     headerItem "Cleaning WinSxS folder" 
     dism /online /Cleanup-Image /StartComponentCleanup /ResetBase
@@ -59,6 +63,19 @@ Function Cleanup {
     headerItem "Clean Software Distribution folder" 
     cleanSoftwareDistribution
     footerItem
+	checkRestorePoints
+	checkWindowsOld
+	# TODO
+	# clear Edge browser'....
+	
+	# clear location history
+	
+	# ipconfig /flushdns ???
+	
+
+	
+	
+
 }
 
 #
@@ -201,13 +218,61 @@ Function ShowLargeFiles
     $ScanPath="C:\"
     Write-Host "Scanning $ScanPath for any large files." -ForegroundColor Green
     Write-Host ( Get-ChildItem $ScanPath -Recurse -ErrorAction SilentlyContinue | 
-  #  Where-Object { $Extensions -contains $_.Extension}| 
     Where-Object { $_.Length -gt 1GB}| 
     Sort-Object Length -Descending | Select-Object Name, Directory,
                     @{Name = "Size (GB)"; Expression = { "{0:N2}" -f ($_.Length / 1GB) }} | Format-Table  -AutoSize |
         Out-String )
 }
 
+Function checkWindowsOld
+{
+	headerItem "test for folder C:\Windows.old"
+    if (Test-path "C:\Windows.old")
+    {
+        Write-Host "folder C:\Windows.Old exist, please use cleanmgr utility to remove" -ForegroundColor Red -BackgroundColor Black
+        Write-Host " Press Windows+R,`nType cleanmgr, then press Enter"
+    }
+    footerItem
+}
+Function cleanIE_Chrome
+{
+	headerItem "cleanup Internet Explorer and Chrome"
+
+	Stop-Process -Name chrome -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 5
+    $DaysToDelete = 1
+
+	$temporaryIEDir = "C:\users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\*" ## Remove all files and folders in user's Temporary Internet Files. 
+	$cachesDir = "C:\Users\*\AppData\Local\Microsoft\Windows\Caches"  ## Remove all IE caches. 
+	$cookiesDir = "C:\Documents and Settings\*\Cookies\*" ## Delets all cookies. 
+	$locSetDir = "C:\Documents and Settings\*\Local Settings\Temp\*"  ## Delets all local settings temp 
+	$locSetIEDir = "C:\Documents and Settings\*\Local Settings\Temporary Internet Files\*"   ## Delets all local settings IE temp 
+	$locSetHisDir = "C:\Documents and Settings\*\Local Settings\History\*"  ## Delets all local settings history
+
+	Get-ChildItem $temporaryIEDir, $cachesDir, $cookiesDir, $locSetDir, $locSetIEDir, $locSetHisDir -Recurse -Force -Verbose -ErrorAction SilentlyContinue | Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$DaysToDelete)) } | remove-item -force -Verbose -recurse -ErrorAction SilentlyContinue
+
+	$DaysToDelete = 7
+
+	$crLauncherDir = "C:\Documents and Settings\%USERNAME%\Local Settings\Application Data\Chromium\User Data\Default"
+	$chromeDir = "C:\Users\*\AppData\Local\Google\Chrome\User Data\Default"
+	$chromeSetDir = "C:\Users\*\Local Settings\Application Data\Google\Chrome\User Data\Default"
+
+	$Items = @("*Archived History*", "*Cache*", "*Cookies*", "*History*", "*Login Data*", "*Top Sites*", "*Visited Links*", "*Web Data*")
+
+	$items | ForEach-Object {
+	$item = $_ 
+	Get-ChildItem $crLauncherDir, $chromeDir, $chromeSetDir -Recurse -Force -ErrorAction SilentlyContinue | 
+		Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$DaysToDelete)) -and $_ -like $item} | ForEach-Object -Process { Remove-Item $_ -force -Verbose -recurse -ErrorAction SilentlyContinue }
+	}
+	footerItem
+}
+
+Function cleanWindowsStore
+{
+	headerItem "cleanup Windows Store"
+	wsreset
+	footerItem
+}
 
 Function clearEventlogs 
 {
@@ -303,6 +368,40 @@ Function runSFC
     $numAfter=(Get-Content C:\windows\Logs\CBS\CBS.log | Select-String -Pattern ', Warning', ', Error' ).length
     $numNew=$numAfter-$numBefore
     Write-Host "CBS.log has $numNew new Warnings/ Errors"
+    footerItem
+}
+
+Function checkRestorePoints
+{
+    Write-Host "Check on Restore Points"
+    $days=60
+    $max=5
+    $count=(Get-ComputerRestorePoint |measure).count
+    if ($count -gt $max)
+    {
+        Write-Host "There are $count System Restore points, please take action" -ForegroundColor Red -BackgroundColor Black
+        Get-ComputerRestorePoint
+    }
+    else
+    {
+        Write-Host "There are $count (less then $max) Restore Points, no action required" -ForegroundColor Green -BackgroundColor Black
+    }
+    $list=""
+    $date = @{Label="Date"; Expression={$_.ConvertToDateTime($_.CreationTime)}}
+    Get-ComputerRestorePoint |Select-Object -Property SequenceNumber, $date, Description |
+        Where-Object { $_.Date -lt $(Get-Date).AddDays(-$days) }|
+        %{ $list+= "$($_.Date) $($_.SequenceNumber) $($_.Description)`n"}
+
+    if ($list -ne "")
+    {
+        Write-Host "`nRestore points older then $days days" -ForegroundColor Red -BackgroundColor Black
+        Write-Host $list
+        Write-Host "To delete a Restore Point : Press Windows+R,`nType System Restore, then press Enter"
+	}
+    else
+    {
+        Write-Host "No Rstore points found older then $days days" -ForegroundColor Green -BackgroundColor Black
+    }
     footerItem
 }
 
@@ -538,6 +637,23 @@ Function menuCheckDiskFS
         }
     }
 }
+Function menuWindowsStore
+{
+# check disk and filesystem
+    While (1 -eq 1)
+    {
+        $list="Clean Windows Store"
+        $list+="|Return to main menu"
+        Write-Host ""
+        $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Quit' $TRUE
+        Switch ($answer)
+        {
+            {$_ -eq 1} {cleanWindowsStore;Break}
+            {$_ -eq 3} {Return;Break}
+            Default { Return }
+        }
+    }
+}
 
 Clear-Host 
 if ($PSVersionTable.PSVersion.Major -lt 5)
@@ -578,6 +694,7 @@ else
         $list+="|Scan for large files"
         $list+="|Change Retention days"
         $list+="|Check Disk and Filesystem menu"
+        $list+="|Clean Windows Store"
         $list+="|Quit"
         Write-Host ""
         $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Quit' $TRUE
@@ -589,7 +706,8 @@ else
             {$_ -eq 4} {ShowLargeFiles;Break}
             {$_ -eq 5} {$global:RetentionDays=$(enterNumber "Change retention days" $global:RetentionDays 7 1 30);Break}
             {$_ -eq 6} {menuCheckDiskFS;Break}
-            {$_ -eq 7} {exit;Break}
+            {$_ -eq 7} {menuWindowsStore;Break}
+            {$_ -eq 8} {exit;Break}
             Default { exit }
         }
     }
