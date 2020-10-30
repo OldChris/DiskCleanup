@@ -13,7 +13,8 @@
 #  4) this script will switch to administrator mode (see menu option)
 #
 #
-Function Cleanup {
+Function cleanTempFolderBrowsersEventLog
+{
     
     cleanFolder "C:\Users\*\AppData\Local\Temp\*" @("*") $global:RetentionDays $True
     cleanFolder "C:\Users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\*" @("*") $global:RetentionDays $True
@@ -34,9 +35,7 @@ Function Cleanup {
     cleanFolder "$Env:windir\logs\CBS\*" @(".log") 0 $True
     cleanFolder "C:\inetpub\logs\LogFiles\*" @("*") 0 $True
 
-    removeFolder "C:\PerfLogs" 
-    removeFolder "C:\Config.Msi" 
-    removeFolder "c:\Intel"
+ 
 
     removeFile "$Env:windir\memory.dmp" $global:RetentionDays
     removeFile "C:\ProgramData\Microsoft\Windows\Power Efficiency Diagnostics\energy-report-*-*-*.xml" $global:RetentionDays
@@ -44,43 +43,193 @@ Function Cleanup {
 
 	cleanIE_Chrome
 
-
-    headerItem "Cleaning WinSxS folder" 
-    dism /online /Cleanup-Image /StartComponentCleanup /ResetBase
+    headerItem "Clean Events logs" 
+    clearEventlogs
     footerItem
 
     headerItem "Empty Recycle Bin."
     # -ErrorAction SilentlyContinue needed to suppress error , this is fixed in PS 7
     Clear-RecycleBin -DriveLetter C -Force -Verbose -ErrorAction SilentlyContinue
-    
+    footerItem
+    headerItem "Cleaning WinSxS folder" 
+    dism /online /Cleanup-Image /StartComponentCleanup /ResetBase
     footerItem
     headerItem "Run Windows Disk Cleaner"
     WindowsDiskCleaner
     footerItem
-    headerItem "Clean Events logs" 
-    clearEventlogs
-    footerItem
+}
+
+
+Function cleanSoftwareDistribution
+{
     headerItem "Clean Software Distribution folder" 
     cleanSoftwareDistribution
     footerItem
+}
+
+Function checkRestorePointsRootfoldersHibernationFile
+{
 	checkRestorePoints
-	checkWindowsOld
+	checkRootFolders
+    checkHibernationFile
+}
+
+Function testNewStuff
+{
+
+}
+Function checkRootFolders
+{
+    headerItem "Check root folder drive C:"
+    $expectedRootFolders=@(
+    "C:\Program Files",
+    "C:\Program Files (x86)",
+    "C:\ProgramData",
+    "C:\Users",
+    "C:\Windows",
+    "C:\Documents and Settings",
+    "C:\System Volume Information",
+    "C:\Boot",
+    'C:\$RECYCLE.BIN'
+
+    )
+    $hint0="this folder is not known to the script, please check for yourself"
+    $hint1="this folder indicates an previous version of Windows exist, please use cleanmgr utility to remove"
+    $hint1+=" Press Windows+R,`nType cleanmgr, then press Enter"
+    $hint2="this folder can be deleted"
+    Get-ChildItem -Path C:\ -Directory -Force -ErrorAction SilentlyContinue |
+    %{ 
+        #Write-Host "$($_.FullName)"
+        if (-Not ($expectedRootFolders -contains "$($_.FullName)") )
+        {
+            $folder="$($_.FullName)"
+            Write-Host "$folder : " -NoNewline
+            Switch ($folder)
+            {
+                'C:\Windows.Old' {Write-Host $hint1 -ForegroundColor Green -BackgroundColor Black ;Break}
+                'C:\$Windows.~WS' {Write-Host $hint1 -ForegroundColor Green -BackgroundColor Black;Break}
+                'C:\Config.Ms'  {Write-Host $hint2;Break}
+                'C:\ESD' {Write-Host $hint2;Break}
+                'C:\Intel' {Write-Host $hint2;Break}
+                'C:\PerfLogs'  {Write-Host $hint2;Break} 
+                Default { Write-Host $hint0}
+            }
+        }
+    }
+    footerItemNoBytes
+}
+
+
 	# TODO
 	# clear Edge browser'....
 	
-	# clear location history
+	# clear location history ???
 	
 	# ipconfig /flushdns ???
 	
-
+    # check for unused AppData folders (left behind, or apps no longer used/uninstalled poorly)
 	
-	
+    # thumbnails, icon cache, fontcache cleanup
 
-}
+    # check Downloads folder > 500 Mb , then give warning
+
+
+
 
 #
 #  functions that clean files, folders, etcetera
 #
+
+Function checkHibernationFile
+{
+    headerItem "check Hibernation file"
+    $hiberfile=$FALSE
+    try
+    { 
+    # 
+        $regVal =(Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Control\Power -name HibernateEnabled -ErrorAction Stop)
+        if ($regVal.HibernateEnabled -eq 1)
+        {
+            $hiberfile=$TRUE
+        }
+        else
+        {
+            $hiberfile=$FALSE
+        }
+    }
+    catch
+    {
+      Write-Host "Can not find the registry key, this can happen if you never switched on Hibernation" -ForegroundColor Red -BackgroundColor Black
+      $hiberfile=$FALSE
+    }
+
+#   if (Test-Path "C:\hiberfil.sys")  # this doesn't work. 
+    if ($hiberfile -eq $TRUE)
+    {
+        Write-Host "Hibernate is swithced on, to save space you can switch it off" 
+        Write-Host "in a Administrator Mode command box type 'powercfg.exe /HIBERNATE OFF' "
+    }
+    else
+    {
+        Write-Host "Hibernate is swithced off"
+    }
+    footerItemNoBytes
+}
+
+
+Function checkUnusedApps
+{
+  # C:\ProgramData 
+  # C:\Users\Chris\AppData\Local\Temp
+    Get-ChildItem -Path C:\ProgramData -Directory -Force -ErrorAction SilentlyContinue |
+    %{ 
+        #$_.FullName;
+        if (checkFolderRecentlyUsed "$($_.FullName)" 180)
+        {
+         #  Write-Host "$_ recently used" 
+        }
+        else
+        {
+           Write-Host "$($_.FullName) NOT recently used" 
+        }
+    }
+}
+Function checkFolderRecentlyUsed
+{
+    Param
+    (
+      [string] $folder,
+      [int32]  $ageLimit
+    )
+    $recentlyUsed=$False
+    if (Test-Path "$folder")
+    {
+        # first test folder itself, then all items in it
+        try
+        {   #-ErrorAction Stop to make Try Catch work
+            if ((Get-Item $folder -ErrorAction Stop  ).CreationTime -gt $(Get-Date).AddDays(-$ageLimit))
+            {
+               $recentlyUsed=$True
+               return $recentlyUsed
+            }
+        }
+        catch [System.Exception]
+        {
+           Write-Host "Folder $folder not accesible" -ForegroundColor DarkGray
+           $recentlyUsed=$True
+           return $recentlyUsed
+        }
+        Get-ChildItem "$folder" -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { ($_.CreationTime -gt $(Get-Date).AddDays(-$ageLimit)) } | 
+        % { $recentlyUsed=$True }    
+    }
+    else
+    {
+        Write-Host "$folder does not exist." -ForegroundColor DarkGray
+    }
+    Return $recentlyUsed
+}
+
 Function cleanFolder
 {
     Param
@@ -102,8 +251,7 @@ Function cleanFolder
     if (Test-Path "$folder")
     {
         Get-ChildItem "$folder" @recurse -Force -ErrorAction SilentlyContinue |
-            #  Where-Object { $extensions -contains $_.Extension}| 
-              Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$retentionDays)) } | 
+        Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$retentionDays)) } | 
         % { 
             if ($extensions -contains $_.Extension)
             { 
@@ -224,16 +372,7 @@ Function ShowLargeFiles
         Out-String )
 }
 
-Function checkWindowsOld
-{
-	headerItem "test for folder C:\Windows.old"
-    if (Test-path "C:\Windows.old")
-    {
-        Write-Host "folder C:\Windows.Old exist, please use cleanmgr utility to remove" -ForegroundColor Red -BackgroundColor Black
-        Write-Host " Press Windows+R,`nType cleanmgr, then press Enter"
-    }
-    footerItem
-}
+
 Function cleanIE_Chrome
 {
 	headerItem "cleanup Internet Explorer and Chrome"
@@ -347,6 +486,7 @@ Function WindowsDiskCleaner
 
 Function cleanSoftwareDistribution
 {
+    headerItem "clean Software Distribution"
     ## Stops the windows update service so that c:\windows\softwaredistribution can be cleaned up
     Get-Service -Name wuauserv | Stop-Service -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue -Verbose
     Get-Service -Name bits | Stop-Service -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue -Verbose
@@ -355,6 +495,7 @@ Function cleanSoftwareDistribution
     ## Restarts wuauserv and bits services
     Get-Service -Name wuauserv | Start-Service -ErrorAction SilentlyContinue -Verbose
     Get-Service -Name bits | Start-Service -ErrorAction SilentlyContinue -Verbose
+    footerItem
 }
 #
 # Check Disk and Filesystem functions
@@ -368,7 +509,7 @@ Function runSFC
     $numAfter=(Get-Content C:\windows\Logs\CBS\CBS.log | Select-String -Pattern ', Warning', ', Error' ).length
     $numNew=$numAfter-$numBefore
     Write-Host "CBS.log has $numNew new Warnings/ Errors"
-    footerItem
+    footerItemNoBytes
 }
 
 Function checkRestorePoints
@@ -402,14 +543,14 @@ Function checkRestorePoints
     {
         Write-Host "No Rstore points found older then $days days" -ForegroundColor Green -BackgroundColor Black
     }
-    footerItem
+    footerItemNoBytes
 }
 
 Function runRepairVolune
 {
     headerItem "Scan volume drive C"
     Repair-Volume -DriveLetter C -Scan
-    footerItem
+    footerItemNoBytes
 }
 
 #
@@ -488,10 +629,16 @@ Function headerItem
 Function footerItem
 {
     $freedUpBytesItem=($(diskFreeBytes) - $global:startFreeBytesItem)
-    $freedUpBytesTotal=($(diskFreeBytes) - $global:startFreeBytesScript)
+    $freedUpBytesTotal=($(diskFreeBytes) - $global:startScriptFreeBytes)
     $freeTextItem=formatBytes $freedUpBytesItem 
     $freeTextTotal=formatBytes $freedUpBytesTotal
     $logText="Done (cleaned up  $freeTextItem, total $freeTextTotal  )" 
+    Write-Host "$logText`n"  -ForegroundColor Green -BackgroundColor Black
+    LogWriteLine "$logText"
+}
+Function footerItemNoBytes
+{
+    $logText="Done" 
     Write-Host "$logText`n"  -ForegroundColor Green -BackgroundColor Black
     LogWriteLine "$logText"
 }
@@ -595,30 +742,52 @@ Function RunsAsAdministrator
     }
 }
 
-Function runCleanup
-{
-    Write-Host "Start script at " (Get-Date | Select-Object -ExpandProperty DateTime)
-    $Starters = (Get-Date)
-    $diskStatusBefore=DiskSpaceStatus
-    $freeBytesBefore=diskFreeBytes
-    Cleanup
-    Write-Host "Before " $diskStatusBefore
-    Write-Host "After " $(DiskSpaceStatus)
-    Write-Host "==> Cleaned up $(formatBytes ($freeBytesBefore-(diskFreeBytes)))"
-    Write-Host "    since first run $(formatBytes ($Global:startScriptFreeBytes-(diskFreeBytes)))"
-
-    $Finished = (Get-Date)
-
-    $minutes=[math]::floor(($Finished - $Starters).totalminutes)
-    $seconds=($Finished - $Starters).totalseconds - 60 * $minutes
-    Write-Host "Elapsed Time: $minutes minutes,  $seconds seconds"
-    Write-Host "Elapsed Time: $(($Finished - $Starters).totalseconds) seconds"
-    Write-Host "Script done"
-
+Function checkForUpdate
+{ 
+    $repo = "OldChris/DiskCleanup"
+    $githubReleases ="https://api.github.com/repos/$repo/releases"
+    $githubDownload="https://github.com/$repo"
+    Write-Host "Check for update...." -NoNewline
+    $tag = (Invoke-WebRequest $githubReleases | ConvertFrom-Json)[0].tag_name
+    if ($tag -eq $null)
+    {
+        Write-Host " can not determine latest release from Github" -ForegroundColor Red
+    }
+    else
+    {
+        if ($tag -eq $appVersion )
+        {
+	        Write-Host "you have the latest version ( $tag )" -ForegroundColor Green
+        }
+        else
+        {
+	        Write-Host "you do not have the latest version" -ForegroundColor Red
+            Write-Host "  this version :  $appVersion , Version on GitHub :  $tag"  -ForegroundColor Red
+	        Write-Host "  download script from Github at $githubDownload. "  -ForegroundColor Red
+        }
+    }
 
 }
 
-Function menuCheckDiskFS
+
+Function cleanupStats
+{
+    Write-Host ""
+
+    Write-Host "Before " $diskStatusBefore
+    Write-Host "After " $(DiskSpaceStatus)
+    Write-Host "==> Cleaned up $(formatBytes ($freeBytesBefore-(diskFreeBytes)))"
+    Write-Host "    since first run $(formatBytes ($global:startScriptFreeBytes-(diskFreeBytes)))"
+
+   # $Finished = (Get-Date)
+
+ #   $minutes=[math]::floor(($Finished - $Starters).totalminutes)
+ #   $seconds=($Finished - $Starters).totalseconds - 60 * $minutes
+ #   Write-Host "Elapsed Time: $minutes minutes,  $seconds seconds"
+ #   Write-Host "Elapsed Time: $(($Finished - $Starters).totalseconds) seconds"
+}
+
+Function menuCheckDiskCheckFS
 {
 # check disk and filesystem
     While (1 -eq 1)
@@ -637,25 +806,31 @@ Function menuCheckDiskFS
         }
     }
 }
-Function menuWindowsStore
+Function menuTempLargeFilesWholeDisk
 {
-# check disk and filesystem
     While (1 -eq 1)
     {
-        $list="Clean Windows Store"
+        $list="List temp files older then $global:RetentionDays days"
+        $list+="|Delete temp files older then $global:RetentionDays days"
+        $list+="|Scan for large files"
         $list+="|Return to main menu"
         Write-Host ""
         $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Quit' $TRUE
         Switch ($answer)
         {
-            {$_ -eq 1} {cleanWindowsStore;Break}
-            {$_ -eq 3} {Return;Break}
+            {$_ -eq 1} {OldLogTempFiles $FALSE;Break}
+            {$_ -eq 2} {OldLogTempFiles $TRUE;Break}
+            {$_ -eq 3} {ShowLargeFiles;Break}
+            {$_ -eq 4} {Return;Break}
             Default { Return }
         }
     }
 }
 
 Clear-Host 
+New-Variable -Name appVersion -Value "v1.0" -Option ReadOnly -Force
+checkForUpdate
+
 if ($PSVersionTable.PSVersion.Major -lt 5)
 {
   Write-Host "Powershell Version : " $PSVersionTable.PSVersion  " should be at least version 5, please upgrade Powershell"
@@ -667,8 +842,8 @@ $thisAppName=(Get-Item $PSCommandPath).Basename
 
 $global:Logfile=$thisPath+"\"+ $thisAppName+ "_" + $(Hostname) + "_" + $(Get-Date -Format "yyyyMMddTHHmmss") + ".log"
 $global:RetentionDays = 7
-$Global:startFreeBytesScript=diskFreeBytes
-Write-Host "$thisAppName, clean disk C:\"
+$global:startScriptFreeBytes=diskFreeBytes
+Write-Host "$thisAppName, clean disk C:\ Version $appVersion" 
 Write-Host "$(Hostname): PS Version :$($PSVersionTable.PSVersion) : Script  $PSCommandPath : Logfile $global:Logfile" 
 if (-Not(RunsAsAdministrator))
 {
@@ -686,28 +861,41 @@ if (-Not(RunsAsAdministrator))
 } 
 else
 {
+    $first=$TRUE
     While (1 -eq 1)
     {
-        $list="Run DiskCleanup script"
-        $list+="|List temp files older then $global:RetentionDays days"
-        $list+="|Delete temp files older then $global:RetentionDays days"
-        $list+="|Scan for large files"
-        $list+="|Change Retention days"
-        $list+="|Check Disk and Filesystem menu"
+        if ($first -eq $TRUE)
+        {
+            $diskStatusBefore=DiskSpaceStatus
+            $freeBytesBefore=diskFreeBytes
+            $first=$FALSE
+        }
+        else
+        {
+            cleanupStats
+        }
+        $list="Change Retention days, is now set at $global:RetentionDays days"
+        $list+="|Clean specific Temp folders, Internet browsers, Recycle Bin and Eventlogs"
+        $list+="|sub-menu: Scan large files and temporary files across the disk"
+        $list+="|Check RestorePoints, Rootfolders and Hibernation File"
+        $list+="|Clean Software Distribution"
+        $list+="|sub-menu: Check Disk and Filesystem"
         $list+="|Clean Windows Store"
+        $list+="|Test"
         $list+="|Quit"
         Write-Host ""
-        $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Quit' $TRUE
+        $answer=selectMenuOption "$thisAppName, Select an option:"  $list 'Quit' $TRUE
         Switch ($answer)
         {
-            {$_ -eq 1} {runCleanup;Break}
-            {$_ -eq 2} {OldLogTempFiles $FALSE;Break}
-            {$_ -eq 3} {OldLogTempFiles $TRUE;Break}
-            {$_ -eq 4} {ShowLargeFiles;Break}
-            {$_ -eq 5} {$global:RetentionDays=$(enterNumber "Change retention days" $global:RetentionDays 7 1 30);Break}
-            {$_ -eq 6} {menuCheckDiskFS;Break}
-            {$_ -eq 7} {menuWindowsStore;Break}
-            {$_ -eq 8} {exit;Break}
+            {$_ -eq 1} {$global:RetentionDays=$(enterNumber "Change retention days" $global:RetentionDays 7 1 30);Break}
+            {$_ -eq 2} {cleanTempFolderBrowsersEventLog;Break}
+            {$_ -eq 3} {menuTempLargeFilesWholeDisk;Break}
+            {$_ -eq 4} {checkRestorePointsRootfoldersHibernationFile;Break}
+            {$_ -eq 5} {cleanSoftwareDistribution;Break}
+            {$_ -eq 6} {menuCheckDiskCheckFS;Break}
+            {$_ -eq 7} {cleanWindowsStore;Break}
+            {$_ -eq 8} {testNewStuff;Break}
+            {$_ -eq 9} {exit;Break}
             Default { exit }
         }
     }
