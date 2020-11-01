@@ -94,11 +94,11 @@ Function checkRootFolders
 
     )
     $hint0="this folder is not known to the script, please check for yourself"
-    $hint1="this folder indicates an previous version of Windows exist, please use cleanmgr utility to remove"
-    $hint1+=" Press Windows+R,`nType cleanmgr, then press Enter"
+    $hint1="this folder indicates an previous version of Windows exist,`n please use cleanmgr utility to remove"
+    $hint1+="`n Press Windows+R,`n Type cleanmgr, then press Enter"
     $hint2="this folder can be deleted"
     Get-ChildItem -Path C:\ -Directory -Force -ErrorAction SilentlyContinue |
-    %{ 
+    ForEach-Object{ 
         #Write-Host "$($_.FullName)"
         if (-Not ($expectedRootFolders -contains "$($_.FullName)") )
         {
@@ -182,7 +182,7 @@ Function checkUnusedApps
   # C:\ProgramData 
   # C:\Users\Chris\AppData\Local\Temp
     Get-ChildItem -Path C:\ProgramData -Directory -Force -ErrorAction SilentlyContinue |
-    %{ 
+    ForEach-Object{ 
         #$_.FullName;
         if (checkFolderRecentlyUsed "$($_.FullName)" 180)
         {
@@ -221,7 +221,7 @@ Function checkFolderRecentlyUsed
         }
         Get-ChildItem "$folder" -Recurse -ErrorAction SilentlyContinue |
         Where-Object { ($_.CreationTime -gt $(Get-Date).AddDays(-$ageLimit)) } | 
-        % { $recentlyUsed=$True }    
+        ForEach-Object { $recentlyUsed=$True }    
     }
     else
     {
@@ -252,7 +252,7 @@ Function cleanFolder
     {
         Get-ChildItem "$folder" @recurse -Force -ErrorAction SilentlyContinue |
         Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$retentionDays)) } | 
-        % { 
+        ForEach-Object { 
             if ($extensions -contains $_.Extension)
             { 
                 Remove-Item $_.FullName -Force -Verbose -ErrorAction SilentlyContinue
@@ -330,7 +330,7 @@ Function OldLogTempFiles
     Get-ChildItem -Path $ScanPath -Recurse -ErrorAction SilentlyContinue | 
     Where-Object { $Extensions -contains $_.Extension}| 
     Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$global:RetentionDays)) }|
-    % { Write-Host $_.Fullname $(formatBytes $_.Length);
+    ForEach-Object { Write-Host $_.Fullname $(formatBytes $_.Length);
         $totalFiles+=1;$totalBytes+=$_.Length;
         if ($deleteItem -eq $TRUE)
 		{ 
@@ -473,8 +473,8 @@ Function WindowsDiskCleaner
     }
 
     # do the cleanup . have to convert the SageSet number
-    $Args = "/sagerun:$([string]([int]$SageSet.Substring($SageSet.Length-4)))"
-   # Start-Process -Wait "$env:SystemRoot\System32\cleanmgr.exe" -ArgumentList $Args #-WindowStyle Hidden
+    $cmdArgs = "/sagerun:$([string]([int]$SageSet.Substring($SageSet.Length-4)))"
+   # Start-Process -Wait "$env:SystemRoot\System32\cleanmgr.exe" -ArgumentList $cmdArgs #-WindowStyle Hidden
     Start-Process -Wait -FilePath "$Env:ComSpec" -ArgumentList "/c title running Cleanmgr, please wait to complete&&echo Cleanmgr is running, please wait...&&cleanmgr /sagerun:99&&pause"
 
     # Remove the Stateflags
@@ -517,7 +517,7 @@ Function checkRestorePoints
     Write-Host "Check on Restore Points"
     $days=60
     $max=5
-    $count=(Get-ComputerRestorePoint |measure).count
+    $count=(Get-ComputerRestorePoint |Measure-Object).count
     if ($count -gt $max)
     {
         Write-Host "There are $count System Restore points, please take action" -ForegroundColor Red -BackgroundColor Black
@@ -531,7 +531,7 @@ Function checkRestorePoints
     $date = @{Label="Date"; Expression={$_.ConvertToDateTime($_.CreationTime)}}
     Get-ComputerRestorePoint |Select-Object -Property SequenceNumber, $date, Description |
         Where-Object { $_.Date -lt $(Get-Date).AddDays(-$days) }|
-        %{ $list+= "$($_.Date) $($_.SequenceNumber) $($_.Description)`n"}
+        ForEach-Object{ $list+= "$($_.Date) $($_.SequenceNumber) $($_.Description)`n"}
 
     if ($list -ne "")
     {
@@ -541,7 +541,7 @@ Function checkRestorePoints
 	}
     else
     {
-        Write-Host "No Rstore points found older then $days days" -ForegroundColor Green -BackgroundColor Black
+        Write-Host "No Restore points found older then $days days" -ForegroundColor Green -BackgroundColor Black
     }
     footerItemNoBytes
 }
@@ -654,7 +654,6 @@ Function enterNumber()
     )
     Do
     {
-        $menuIndex=0
         if ($warning -ne "")
         {
             Write-Host $warning
@@ -749,7 +748,7 @@ Function checkForUpdate
     $githubDownload="https://github.com/$repo"
     Write-Host "Check for update...." -NoNewline
     $tag = (Invoke-WebRequest $githubReleases | ConvertFrom-Json)[0].tag_name
-    if ($tag -eq $null)
+    if ($null -eq $tag)
     {
         Write-Host " can not determine latest release from Github" -ForegroundColor Red
     }
@@ -854,7 +853,7 @@ if (-Not(RunsAsAdministrator))
     $answer=selectMenuOption "Enter your choise:" $list 'Quit' $TRUE
     Switch ($answer)
     {
-        {$_ -eq 1} {Start-Process "$psHome\powershell_ise.exe" -Verb Runas -ArgumentList "-file ""$PSCommandPath""";Break}
+        {$_ -eq 1} {Start-Process "$psHome\powershell.exe" -Verb Runas -ArgumentList "-file ""$PSCommandPath""";Break}
         {$_ -eq 2} {exit;Break}
         Default { exit }
     }
