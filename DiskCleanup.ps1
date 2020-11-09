@@ -16,24 +16,26 @@
 Function cleanTempFolderBrowsersEventLog
 {
     
-    cleanFolder "C:\Users\*\AppData\Local\Temp\*" @("*") $global:RetentionDays $True
-    cleanFolder "C:\Users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\*" @("*") $global:RetentionDays $True
-    cleanFolder "C:\Users\*\AppData\Local\Microsoft\Windows\WER\*" @("*") $global:RetentionDays $True
-    cleanFolder "C:\Users\*\AppData\Local\Microsoft\Windows\Explorer\*" @(".etl", ".db") $global:RetentionDays $True
-    cleanFolder "C:\Users\*\AppData\Local\Microsoft\Internet Explorer\*" @("*") $global:RetentionDays $True
-    cleanFolder "C:\Users\*\AppData\Local\Microsoft\Terminal Server Client\Cache\*" @("*") $global:RetentionDays $True
+    cleanFolder "User's TEMP" "C:\Users\*\AppData\Local\Temp\*" @("*") $global:RetentionDays $True
+    cleanFolder "Temporary Internet Files" "C:\Users\*\AppData\Local\Microsoft\Windows\Temporary Internet Files\*" @("*") $global:RetentionDays $True
+    cleanFolder "Crash Dumps" "C:\Users\*\AppData\Local\CrashDumps\*" @("*") $global:RetentionDays $True
+    cleanFolder "Windows Error Reporting" "C:\Users\*\AppData\Local\Microsoft\Windows\WER\*" @("*") $global:RetentionDays $True
+    cleanFolder "Event Trace Logs and Thumbnails" "C:\Users\*\AppData\Local\Microsoft\Windows\Explorer\*" @(".etl", ".db") $global:RetentionDays $True
+    cleanFolder "Internet Explorer" "C:\Users\*\AppData\Local\Microsoft\Internet Explorer\*" @("*") $global:RetentionDays $True
+    cleanFolder "Terminal Server cache" "C:\Users\*\AppData\Local\Microsoft\Terminal Server Client\Cache\*" @("*") $global:RetentionDays $True
+    cleanFolder "Recently used documents and folders" "C:\Users\*\AppData\Roaming\Microsoft\Windows\Recent\*" @(".lnk") $global:RetentionDays $True
 
-    cleanFolder "$Env:windir\SoftwareDistribution\DataStore\Logs\*" @(".log") $global:RetentionDays $True
-    cleanFolder "$Env:windir\Performance\WinSAT\DataStore\*" @("*") $global:RetentionDays $True
-    cleanFolder "$Env:windir\system32\catroot2\*" @(".jrs", ".log") $global:RetentionDays $True
-    cleanFolder "$Env:windir\system32\wdi\LogFiles\*" @("*") $global:RetentionDays $True
-    cleanFolder "$Env:windir\debug\*" @(".log") $global:RetentionDays $True
-    cleanFolder "$Env:windir\Temp\*" @("*") $global:RetentionDays $True
-    cleanFolder "$Env:windir\Prefetch\*" @("*") $global:RetentionDays $True
-    cleanFolder "C:\ProgramData\Microsoft\Windows\WER\*" @("*") $global:RetentionDays $True
+    cleanFolder "Software Distribution Logfiles" "$Env:windir\SoftwareDistribution\DataStore\Logs\*" @(".log") $global:RetentionDays $True
+    cleanFolder "" "$Env:windir\Performance\WinSAT\DataStore\*" @("*") $global:RetentionDays $True
+    cleanFolder "Software Distribution logfiles" "$Env:windir\system32\catroot2\*" @(".jrs", ".log") $global:RetentionDays $True
+    cleanFolder "Windows Diagnostics Infrastructure logfiles" "$Env:windir\system32\wdi\LogFiles\*" @("*") $global:RetentionDays $True
+    cleanFolder "Windows Debug" "$Env:windir\debug\*" @(".log") $global:RetentionDays $True
+    cleanFolder "Windows Temp" "$Env:windir\Temp\*" @("*") $global:RetentionDays $True
+    cleanFolder "Prefetch" "$Env:windir\Prefetch\*" @("*") $global:RetentionDays $True
+    cleanFolder "Windows Error Reporting" "C:\ProgramData\Microsoft\Windows\WER\*" @("*") $global:RetentionDays $True
 
-    cleanFolder "$Env:windir\logs\CBS\*" @(".log") 0 $True
-    cleanFolder "C:\inetpub\logs\LogFiles\*" @("*") 0 $True
+    cleanFolder "" "$Env:windir\logs\CBS\*" @(".log") 0 $True
+    cleanFolder "" "C:\inetpub\logs\LogFiles\*" @("*") 0 $True
 
  
 
@@ -41,7 +43,7 @@ Function cleanTempFolderBrowsersEventLog
     removeFile "C:\ProgramData\Microsoft\Windows\Power Efficiency Diagnostics\energy-report-*-*-*.xml" $global:RetentionDays
 
 
-	cleanIE_Chrome
+	cleanIE_Chrome_Edge_Firefox
 
     headerItem "Clean Events logs" 
     clearEventlogs
@@ -54,9 +56,7 @@ Function cleanTempFolderBrowsersEventLog
     headerItem "Cleaning WinSxS folder" 
     dism /online /Cleanup-Image /StartComponentCleanup /ResetBase
     footerItem
-    headerItem "Run Windows Disk Cleaner"
-    WindowsDiskCleaner
-    footerItem
+
 }
 
 
@@ -75,9 +75,15 @@ Function checkRestorePointsRootfoldersHibernationFile
 }
 
 Function testNewStuff
+{    
+}
+Function cleanWDIfolder
 {
+    headerItem "clean Windows Diagnostics Infrastructure"
+    cleanFolder "" "C:\Windows\System32\WDI\*" @("*") 0 $True
 
 }
+
 Function checkRootFolders
 {
     headerItem "Check root folder drive C:"
@@ -121,8 +127,7 @@ Function checkRootFolders
 
 
 	# TODO
-	# clear Edge browser'....
-	
+
 	# clear location history ???
 	
 	# ipconfig /flushdns ???
@@ -234,6 +239,7 @@ Function cleanFolder
 {
     Param
     (
+      [string] $description,
       [string] $folder,
       [string[]] $extensions,
       [int32]  $retentionDays,
@@ -247,7 +253,8 @@ Function cleanFolder
     {
         $recurse=""
     }
-    headerItem "Clean folder $folder any $extensions files older then $retentionDays days." -ForegroundColor Green
+    
+    headerItem "$description clean folder $folder any $extensions files older then $retentionDays days." -ForegroundColor Green
     if (Test-Path "$folder")
     {
         Get-ChildItem "$folder" @recurse -Force -ErrorAction SilentlyContinue |
@@ -330,7 +337,7 @@ Function OldLogTempFiles
     Get-ChildItem -Path $ScanPath -Recurse -ErrorAction SilentlyContinue | 
     Where-Object { $Extensions -contains $_.Extension}| 
     Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$global:RetentionDays)) }|
-    ForEach-Object { Write-Host $_.Fullname $(formatBytes $_.Length);
+    ForEach-Object { Write-Host $_.Fullname $(formatBytes $_.Length) -NoNewline;
         $totalFiles+=1;$totalBytes+=$_.Length;
         if ($deleteItem -eq $TRUE)
 		{ 
@@ -338,12 +345,12 @@ Function OldLogTempFiles
            $FileExists = Test-Path $_.Fullname;
             If ($FileExists -eq $True) 
             {
-                Write-Host "File could not be deleted" -ForegroundColor Red
+                Write-Host " file could not be deleted" -ForegroundColor Red
                 $totalFilesNotDeleted+=1;$totalBytesNotDeleted+=$_.Length;
             }
             Else
             {
-                Write-Host "deleted" -ForegroundColor Green
+                Write-Host " deleted" -ForegroundColor Green
                 $totalFilesDeleted+=1;$totalBytesDeleted+=$_.Length;
 			}
 		#	;
@@ -373,9 +380,9 @@ Function ShowLargeFiles
 }
 
 
-Function cleanIE_Chrome
+Function cleanIE_Chrome_Edge_Firefox
 {
-	headerItem "cleanup Internet Explorer and Chrome"
+	headerItem "cleanup Internet Explorer, Chrome, Edge, Firefox"
 
 	Stop-Process -Name chrome -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 5
@@ -403,6 +410,37 @@ Function cleanIE_Chrome
 	Get-ChildItem $crLauncherDir, $chromeDir, $chromeSetDir -Recurse -Force -ErrorAction SilentlyContinue | 
 		Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$DaysToDelete)) -and $_ -like $item} | ForEach-Object -Process { Remove-Item $_ -force -Verbose -recurse -ErrorAction SilentlyContinue }
 	}
+
+	$DaysToDelete = 3
+
+#	$crLauncherDir = "C:\Documents and Settings\%USERNAME%\Local Settings\Application Data\Chromium\User Data\Default"
+	$edgeDir = "C:\Users\*\AppData\Local\Microsoft\Edge\User Data\Default"
+	$edgeSetDir = "C:\Users\*\Local Settings\Application Data\Microsoft\Edge\User Data"
+
+	$Items = @("*Archived History*", "*Cache*", "*Cookies*", "*History*", "*Login Data*", "*Top Sites*", "*Visited Links*", "*Web Data*")
+
+	$items | ForEach-Object {
+	$item = $_ 
+	Get-ChildItem $edgeDir, $edgeSetDir -Recurse -Force -ErrorAction SilentlyContinue | 
+		Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$DaysToDelete)) -and $_ -like $item} | ForEach-Object -Process { Remove-Item $_ -force -Verbose -recurse -ErrorAction SilentlyContinue }
+	}
+
+	$DaysToDelete = 1
+
+#	$crLauncherDir = "C:\Documents and Settings\%USERNAME%\Local Settings\Application Data\Chromium\User Data\Default"
+	$firefoxDir = "C:\Users\*\AppData\Local\Mozilla\Firefox\"
+#	$firefoxSetDir = "C:\Users\*\Local Settings\Application Data\Microsoft\Edge\User Data"
+
+	$Items = @("*cache2*")
+
+	$Items | ForEach-Object {
+	$item = $_ 
+	Get-ChildItem $firefoxDir -Recurse -Force -ErrorAction SilentlyContinue | 
+		Where-Object { ($_.CreationTime -lt $(Get-Date).AddDays(-$DaysToDelete)) -and $_ -like $item} | ForEach-Object -Process { Remove-Item $_ -force -Verbose -recurse -ErrorAction SilentlyContinue }
+	}
+
+
+
 	footerItem
 }
 
@@ -422,6 +460,7 @@ Function clearEventlogs
 
 Function WindowsDiskCleaner
 {
+    headerItem "run Windows disk cleaner (cleanmgr)"
     # when changing StateFlags number please check run command for cleanmgr
     $SageSet = "StateFlags0099"
     $Base = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\"
@@ -482,6 +521,7 @@ Function WindowsDiskCleaner
     {
         Remove-ItemProperty -Path $($Base+$Location) -Name $SageSet -Force -ErrorAction SilentlyContinue | Out-Null
     }
+    footerItem
 } 
 
 Function cleanSoftwareDistribution
@@ -496,6 +536,21 @@ Function cleanSoftwareDistribution
     Get-Service -Name wuauserv | Start-Service -ErrorAction SilentlyContinue -Verbose
     Get-Service -Name bits | Start-Service -ErrorAction SilentlyContinue -Verbose
     footerItem
+
+ 
+
+
+
+}
+
+Function cleanCatroot2
+{
+    headerItem "clean Catroot2 folder"
+    Get-Service -Name cryptsvc | Stop-Service -Force -ErrorAction SilentlyContinue -WarningAction SilentlyContinue -Verbose
+    Copy-Item "C:\Windows\System32\Catroot2" "C:\Windows\System32\Catroot2.old" -force -recurse -verbose 
+    Get-ChildItem "C:\Windows\System32\Catroot2\*" -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -recurse -ErrorAction SilentlyContinue -Verbose
+    Get-Service -Name cryptsvc | Start-Service -ErrorAction SilentlyContinue -Verbose
+    footerItemNobytes
 }
 #
 # Check Disk and Filesystem functions
@@ -750,7 +805,7 @@ Function checkForUpdate
     $tag = (Invoke-WebRequest $githubReleases | ConvertFrom-Json)[0].tag_name
     if ($null -eq $tag)
     {
-        Write-Host " can not determine latest release from Github" -ForegroundColor Red
+        Write-Host " can not determine latest release from Github ($repo)" -ForegroundColor Red
     }
     else
     {
@@ -775,8 +830,8 @@ Function cleanupStats
 
     Write-Host "Before " $diskStatusBefore
     Write-Host "After " $(DiskSpaceStatus)
-    Write-Host "==> Cleaned up $(formatBytes ($freeBytesBefore-(diskFreeBytes)))"
-    Write-Host "    since first run $(formatBytes ($global:startScriptFreeBytes-(diskFreeBytes)))"
+    Write-Host "==> Cleaned up $(formatBytes ((diskFreeBytes)-$freeBytesBefore))"
+    Write-Host "    since first run $(formatBytes ((diskFreeBytes)-$global:startScriptFreeBytes))"
 
    # $Finished = (Get-Date)
 
@@ -795,7 +850,7 @@ Function menuCheckDiskCheckFS
         $list+="|Run System File Checker (SFC) utility"
         $list+="|Return to main menu"
         Write-Host ""
-        $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Quit' $TRUE
+        $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Return to main menu' $TRUE
         Switch ($answer)
         {
             {$_ -eq 1} {runRepairVolune;Break}
@@ -805,6 +860,35 @@ Function menuCheckDiskCheckFS
         }
     }
 }
+
+Function menuWindowsStoreCleanmgr
+{
+# check disk and filesystem
+    While (1 -eq 1)
+    {
+        $list="Clean Windows Store"
+        $list+="|Run Windows Disk Cleaner (cleanmgr)"
+        $list+="|Clean Software Distribution (Windows update)"
+        $list+="|Clean Catroot2 folder (windows update)"
+        $list+="|Clean Windows Diagnostics Infrastructure (WDI)"
+        $list+="|Return to main menu"
+        Write-Host ""
+        $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Return to main menu' $TRUE
+        Switch ($answer)
+        {
+            {$_ -eq 1} {cleanWindowsStore;Break}
+            {$_ -eq 2} {WindowsDiskCleaner;Break}
+            {$_ -eq 3} {cleanSoftwareDistribution;Break}
+            {$_ -eq 4} {cleanCatroot2;Break}
+            {$_ -eq 5} {cleanWDIfolder;Break}
+            {$_ -eq 6} {Return;Break}
+            Default { Return }
+        }
+    }
+}
+
+
+
 Function menuTempLargeFilesWholeDisk
 {
     While (1 -eq 1)
@@ -814,7 +898,7 @@ Function menuTempLargeFilesWholeDisk
         $list+="|Scan for large files"
         $list+="|Return to main menu"
         Write-Host ""
-        $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Quit' $TRUE
+        $answer=selectMenuOption "$thisAppName : Enter your choise:"  $list 'Return to main menu' $TRUE
         Switch ($answer)
         {
             {$_ -eq 1} {OldLogTempFiles $FALSE;Break}
@@ -853,7 +937,7 @@ if (-Not(RunsAsAdministrator))
     $answer=selectMenuOption "Enter your choise:" $list 'Quit' $TRUE
     Switch ($answer)
     {
-        {$_ -eq 1} {Start-Process "$psHome\powershell.exe" -Verb Runas -ArgumentList "-file ""$PSCommandPath""";Break}
+        {$_ -eq 1} {Start-Process "$psHome\powershell_ise.exe" -Verb Runas -ArgumentList "-file ""$PSCommandPath""";Break}
         {$_ -eq 2} {exit;Break}
         Default { exit }
     }
@@ -877,9 +961,8 @@ else
         $list+="|Clean specific Temp folders, Internet browsers, Recycle Bin and Eventlogs"
         $list+="|sub-menu: Scan large files and temporary files across the disk"
         $list+="|Check RestorePoints, Rootfolders and Hibernation File"
-        $list+="|Clean Software Distribution"
         $list+="|sub-menu: Check Disk and Filesystem"
-        $list+="|Clean Windows Store"
+        $list+="|sub-menu: Clean Windows Store, run Windows Disk Clean, clean Software Distribution"
         $list+="|Test"
         $list+="|Quit"
         Write-Host ""
@@ -890,11 +973,10 @@ else
             {$_ -eq 2} {cleanTempFolderBrowsersEventLog;Break}
             {$_ -eq 3} {menuTempLargeFilesWholeDisk;Break}
             {$_ -eq 4} {checkRestorePointsRootfoldersHibernationFile;Break}
-            {$_ -eq 5} {cleanSoftwareDistribution;Break}
-            {$_ -eq 6} {menuCheckDiskCheckFS;Break}
-            {$_ -eq 7} {cleanWindowsStore;Break}
-            {$_ -eq 8} {testNewStuff;Break}
-            {$_ -eq 9} {exit;Break}
+            {$_ -eq 5} {menuCheckDiskCheckFS;Break}
+            {$_ -eq 6} {menuWindowsStoreCleanmgr;Break}
+            {$_ -eq 7} {testNewStuff;Break}
+            {$_ -eq 8} {exit;Break}
             Default { exit }
         }
     }
