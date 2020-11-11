@@ -944,6 +944,9 @@ if (-Not(RunsAsAdministrator))
 } 
 else
 {
+    # Set priority to Idle
+    $thisProcess = Get-Process -id $pid
+    $thisProcess.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::Idle
     $first=$TRUE
     While (1 -eq 1)
     {
